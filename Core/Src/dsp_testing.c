@@ -6,7 +6,7 @@
  */
 #include <stdio.h>
 #include "main.h"
-#include "freeRTOS.h"
+#include "FreeRTOS.h"
 #include "debugRTT.h"
 #include "saved_signal.h"
 
@@ -19,18 +19,36 @@ void prvDSPTestingTask( void *pvParameters ) {
 
 	int samples = 5000;  // How many samples are received and sent back. Size of alloc'd buffers in int16 s.
 	int bytesPsamp = 2;  // 2 bytes per data sample (int16_t)
+	int16_t specs[] = {(int16_t)samples, (int16_t)bytesPsamp};
+
 	printf("Begin DSP testing task\n");
 
 
+	int16_t allocArrayI[samples];								// Allocate memory for RTT buffer
+	int16_t allocArrayQ[samples];								// Allocate memory for RTT buffer
+	array2RTTbuffer(1, 1, allocArrayI, sizeof(allocArrayI));	// Configure RTT up-buffer '1'='DataOutI'
+	array2RTTbuffer(1, 2, allocArrayQ, sizeof(allocArrayQ));	// Configure RTT up-buffer '2'='DataOutQ'
+	int16_t allocDownArrayI[samples];								// Allocate memory for RTT buffer
+	int16_t allocDownArrayQ[samples];								// Allocate memory for RTT buffer
+	array2RTTbuffer(-1, 1, allocDownArrayI, sizeof(allocDownArrayI));	// Configure RTT down-buffer '1'='DataInI'
+	array2RTTbuffer(-1, 2, allocDownArrayQ, sizeof(allocDownArrayQ));	// Configure RTT down-buffer '2'='DataInQ'
+	printf("Alloc'd all buffers\n");
+
+
+	//int16_t allocArraySpecs[2];										// Allocate memory for RTT buffer
+	//array2RTTbuffer(1, 1, allocArraySpecs, sizeof(allocArraySpecs));// Configure RTT up-buffer '3'='DataOut'
+	SEGGER_RTT_Write(1, &specs[0], sizeof(specs));					// Send data specs to Python script
+	printf("Sent specs: %d samples per loop & %d bytes per sample\n", samples, bytesPsamp);
+
 	/*
 	 * DATA IN part
-	 */
+
 	// Allocate and configure RTT down-buffers
 	int16_t allocDownArrayI[samples];								// Allocate memory for RTT buffer
 	int16_t allocDownArrayQ[samples];								// Allocate memory for RTT buffer
 	array2RTTbuffer(-1, 1, allocDownArrayI, sizeof(allocDownArrayI));	// Configure RTT down-buffer '1'='DataInI'
 	array2RTTbuffer(-1, 2, allocDownArrayQ, sizeof(allocDownArrayQ));	// Configure RTT down-buffer '2'='DataInQ'
-
+	*/
 	// READ THE DOWN BUFFER
 	int16_t readDataI[samples];
 	int16_t readDataQ[samples];
@@ -63,12 +81,12 @@ void prvDSPTestingTask( void *pvParameters ) {
 
 	/*
 	 * DATA OUT part
-	 */
+
 	int16_t allocArrayI[samples];								// Allocate memory for RTT buffer
 	int16_t allocArrayQ[samples];								// Allocate memory for RTT buffer
 	array2RTTbuffer(1, 1, allocArrayI, sizeof(allocArrayI));	// Configure RTT up-buffer '1'='DataOutI'
 	array2RTTbuffer(1, 2, allocArrayQ, sizeof(allocArrayQ));	// Configure RTT up-buffer '2'='DataOutQ'
-
+	*/
 	/*
 	 * // Add 10k _SAVED_ signal points to test array ; OBSOLETE as data samples come through RTT now
 	int16_t testArr[samples];
