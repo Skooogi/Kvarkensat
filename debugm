@@ -1,0 +1,7 @@
+#!/bin/bash
+
+make
+cd build
+JLinkExe -commanderscript ../cmd.jlink
+JLinkGDBServer -Device STM32H743ZI &
+alacritty -e arm-none-eabi-gdb --eval-command="target remote localhost:2331" Kvarkensat.elf
