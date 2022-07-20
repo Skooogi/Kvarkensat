@@ -74,6 +74,7 @@ def bytes2floats(rtt_bytes: list[int], bytes_per_float: int, do_prints: bool) ->
 
     return data
 
+
 #
 # Writing the data to a separate .csv-file
 #

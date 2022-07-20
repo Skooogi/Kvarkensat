@@ -57,7 +57,7 @@ len_total = len(i_data)                            # Total data length to keep c
 # Specs being number of samples to send at a time and how many bytes/sample.
 specs_bytes = jlink.rtt_read(3, 6)
 if len(specs_bytes) >= 6:
-    specs = lil_endian.bytes2ints(specs_bytes, bytes_per_smpl, False)
+    specs = lil_endian.bytes2ints(specs_bytes, bytes_per_sent, False)
     samples = specs[0]
     bytes_per_smpl = specs[1]
     sleeptime = specs[2]
@@ -106,11 +106,11 @@ while True:
         # SEND DATA:
         # 1.calculate last idx; 2.convert data to bytes; 3.write data to RTT buffer
         #
-        last_idx = (k+1) * samples * bytes_per_sent - 1 + 1  # One sacrificial byte must be sent to be missed by RTT read
+        last_idx = (k+1) * samples * bytes_per_smpl - 1 + 1  # One sacrificial byte must be sent to be missed by RTT read
 
         print(f"Sending {samples} samples, sent {k*samples}/{send_sams}, loop {k+1}/{loops}")
-        jlink.rtt_write(1, i_bytes[k * samples * bytes_per_sent:last_idx])  # write data (as bytes) to RTT down-buffer '1'
-        jlink.rtt_write(2, q_bytes[k * samples * bytes_per_sent:last_idx])  # write data (as bytes) to RTT down-buffer '2'
+        jlink.rtt_write(1, i_bytes[k * samples * bytes_per_smpl:last_idx])  # write data (as bytes) to RTT down-buffer '1'
+        jlink.rtt_write(2, q_bytes[k * samples * bytes_per_smpl:last_idx])  # write data (as bytes) to RTT down-buffer '2'
 
         print(f"Sent data. Sleeping..")
         time.sleep(sleeptime / 1000)
@@ -137,8 +137,8 @@ while True:
     if leftover_samples > 0:
         print(f"Sending {leftover_samples} leftover samples, sent {loops*samples}/{send_sams}")
         # write data (as bytes) to RTT down-buffer '1' & '2'
-        jlink.rtt_write(1, i_bytes[loops * samples * bytes_per_sent:len_total * bytes_per_sent])
-        jlink.rtt_write(2, q_bytes[loops * samples * bytes_per_sent:len_total * bytes_per_sent])
+        jlink.rtt_write(1, i_bytes[loops * samples * bytes_per_smpl:len_total * bytes_per_smpl])
+        jlink.rtt_write(2, q_bytes[loops * samples * bytes_per_smpl:len_total * bytes_per_smpl])
         # Sleep a synchronized time with STM
         print(f"Sent data. Sleeping..")
         time.sleep(sleeptime / 1000)

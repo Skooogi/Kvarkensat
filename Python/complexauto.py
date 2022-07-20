@@ -77,7 +77,7 @@ while True:
 
     # User input 'q' closes RTT session and stops execution of script
     if user == 'q' or user == 'quit' or user == 'n':
-        jlink.rtt_stop()
+        #jlink.rtt_stop()
         print("Stopping execution.\n")
         exit()
 
