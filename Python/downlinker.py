@@ -42,7 +42,7 @@ print(f"RTT down-buff I desc: {jlink.rtt_get_buf_descriptor(1, False)}")
 print(f"RTT down-buff Q desc: {jlink.rtt_get_buf_descriptor(2, False)}")
 
 #
-# VARIABLES TO MODIFY, especially 'samples', 'bytes_per_int' might screw everything
+# VARIABLES TO MODIFY, especially 'samples', 'bytes_per_smpl' might screw everything
 #
 samples = 5000                                      # How many samples are processed per loop.
 sleeptime = 10                                      # How long a loop sleeps after sending data.
@@ -71,8 +71,8 @@ while True:
         send_sams = int(user)
 
     last_idx = send_sams*bytes_per_int - 1
-    i_bytes = lil_endian.bytes_from_data(i_data, bytes_per_int, False)
-    q_bytes = lil_endian.bytes_from_data(q_data, bytes_per_int, False)
+    i_bytes = lil_endian.ints2bytes(i_data, bytes_per_int, False)
+    q_bytes = lil_endian.ints2bytes(q_data, bytes_per_int, False)
     # print(f"I data as bytes: {i_bytes[0:last_idx]}")
     # print(f"Q data as bytes: {q_bytes[0:last_idx]}")
     print(f"Sending {send_sams} samples, {last_idx+1} bytes")

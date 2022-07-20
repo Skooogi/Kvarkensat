@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import lil_endian       # simple func. flips and parses the read data bytes
 
 #
-# VARIABLES TO MODIFY; Especially 'samples', 'bytes_per_int', although they are only DEFAULTS
+# VARIABLES TO MODIFY; Especially 'samples', 'bytes_per_smpl', although they are only DEFAULTS
 #                      that will be used if values are not read from target device in initialization.
 #
 samples = 100                       # How many samples are processed per loop. DEFAULT
@@ -48,15 +48,15 @@ print(f"RTT satus: {jlink.rtt_get_status()}")       # check RTT status, note int
 
 i_data = lil_endian.txt_reader("hI.txt")            # Saved signal from .txt file
 q_data = lil_endian.txt_reader("hQ.txt")            # Saved signal from .txt file
-i_bytes = lil_endian.bytes_from_data(i_data, bytes_per_int, False)
-q_bytes = lil_endian.bytes_from_data(q_data, bytes_per_int, False)
+i_bytes = lil_endian.ints2bytes(i_data, bytes_per_int, False)
+q_bytes = lil_endian.ints2bytes(q_data, bytes_per_int, False)
 total_data = len(i_data)                            # Total data length to keep cycling data in loop
 
 # Read the 'specs' for RTT communication.
 # Specs being number of samples to send at a time and how many bytes/sample.
 specs_bytes = jlink.rtt_read(3, 6)
 if len(specs_bytes) >= 6:
-    specs = lil_endian.byte_parser(specs_bytes, bytes_per_int, False)
+    specs = lil_endian.bytes2ints(specs_bytes, bytes_per_int, False)
     samples = specs[0]
     bytes_per_int = specs[1]
     sleeptime = specs[2]
@@ -109,8 +109,8 @@ while True:
     #
     read_bytes_i = jlink.rtt_read(1, send_sams * bytes_per_int)             # Read I data from RTT buffer '1'
     read_bytes_q = jlink.rtt_read(2, sens_sams * bytes_per_int)             # Read Q data from RTT buffer '2'
-    read_i = lil_endian.byte_parser(read_bytes_i, bytes_per_int, False)     # Bytes to integers
-    read_q = lil_endian.byte_parser(read_bytes_q, bytes_per_int, False)     # Bytes to integers
+    read_i = lil_endian.bytes2ints(read_bytes_i, bytes_per_int, False)  # Bytes to integers
+    read_q = lil_endian.bytes2ints(read_bytes_q, bytes_per_int, False)  # Bytes to integers
 
     #
     # PLOTTING

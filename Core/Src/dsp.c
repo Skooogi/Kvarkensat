@@ -7,10 +7,15 @@
  *
  */
 
-
-#include "stdlib.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <complex.h>
+#include <liquid.h>  //Added this, but why wasn't it here? -Topi
 #include "dsp.h"
 #include "buffer.h"
+#include "saved_signal.h"
+#include "SEGGER_RTT.h"
+#include "debugRTT.h"
 
 
 struct dsp dsp;																															// Define the dsp struct
@@ -18,6 +23,37 @@ struct dsp dsp;																															// Define the dsp struct
 
 void prvDSPInit()
 {
+
+	/*
+    // options
+    unsigned int n=16;  // input data size
+    int flags=0;        // FFT flags (typically ignored)
+
+    // allocated memory arrays
+    float complex * x = (float complex*) malloc(n * sizeof(float complex));
+    float complex * y = (float complex*) malloc(2*n * sizeof(float complex));
+
+    // create FFT plan
+    //fftplan q = fft_create_plan(n, x, y, LIQUID_FFT_FORWARD, flags);
+
+    // initialize input
+	unsigned int i;
+	for (i = 0; i < n; i++) {
+		x[i] = (float)i - _Complex_I*(float)i;
+	}
+	// create fft plans
+	fftplan pf = fft_create_plan(n, x, y, LIQUID_FFT_FORWARD,  flags);
+
+	// print fft plans
+	fft_print_plan(pf);
+    // execute FFT (repeat as necessary)
+    fft_execute(pf);
+
+    // destroy FFT plan and free memory arrays
+    fft_destroy_plan(pf);
+    free(x);
+    free(y);
+    */
 
 	/* General init */
 	dsp.batch_counter = 0;																												// Reset the batch counter (how many times DSP has been requested)
@@ -36,7 +72,7 @@ void prvDSPInit()
     dsp.fr.mu = 0.0f;          																											// Fractional timing offset TODO: Don't know what this does
     dsp.fr.num_taps = estimate_req_filter_len( dsp.fr.ft, dsp.fr.attenuation );															// Estimate filter length
     dsp.fr.taps = malloc( dsp.fr.num_taps * sizeof(float) );																			// Allocate memory for the filter coefficients based on estimated length
-    liquid_firdes_kaiser( dsp.fr.num_taps, dsp.fr.fc, dsp.fr.attenuation, dsp.fr.mu, dsp.fr.taps );										// Create filter taps and store them and their length
+    //liquid_firdes_kaiser( dsp.fr.num_taps, dsp.fr.fc, dsp.fr.attenuation, dsp.fr.mu, dsp.fr.taps );										// Create filter taps and store them and their length
     dsp.fr.filter = firfilt_crcf_create( dsp.fr.taps, dsp.fr.num_taps );																// Create filter object
 
     /* resamp init */
@@ -113,17 +149,18 @@ static void prvSubtractMean()
  * 13.	Extract/decode packet		--------- Extract and destuff packet. Pack array of "bits" to actual binary (bytes).
  * 14. 	--> Output					--------- Push result to output buffer.
  */
-static void prvDSPPipeline()
+void prvDSPPipeline()
 {
-	/* Interleave the I and Q signals to one single complex IQ array. */
+
+	/* Interleave the I and Q signals to one single complex IQ array.
 	for(uint32_t i=0; i<ADC_RX_BUF_SIZE; i++)
-	{
-		/* ADC dualmode sampling stores both I and Q samples in same buffer as single 32 bit value (2*16 bits) so they have to be separated */
+	{*/
+		/* ADC dualmode sampling stores both I and Q samples in same buffer as single 32 bit value (2*16 bits) so they have to be separated
 		// TODO: Check the endiannes correct bytes are taken
 		int16_t I_value = adcIQ.data[i] & 0x00FF;
 		int16_t Q_value = (adcIQ.data[i] >> 16) & 0x00FF;
 		dsp.raw_IQ[i] = I_value + Q_value*I;
-	}
+	}*/
 
 	/* Remove DC spike from the data. */
 	prvSubtractMean( dsp.raw_IQ, ADC_RX_BUF_SIZE );
@@ -148,7 +185,7 @@ static void prvDSPPipeline()
 		}
 		dsp.downmix_freq = (dsp.fft.max_mag_idx - FFT_SIZE) * ADC_SAMPLERATE / FFT_SIZE;							// Calculate peak frequency (source: https://stackoverflow.com/questions/4364823/how-do-i-obtain-the-frequencies-of-each-value-in-an-fftd) TODO: Check sign
 
-		/* Peak expected around 25 kHz or -25 kHz, check if downmix_freq has valid value */
+		// Peak expected around 25 kHz or -25 kHz, check if downmix_freq has valid value
 		if( (dsp.downmix_freq > 30000 && dsp.downmix_freq < 20000) || (dsp.downmix_freq < -30000 && dsp.downmix_freq > -20000) )	// If true, mix frequency far off --> no AIS data
 		{
 			return;																									// Return from function to wait for new ADC data
@@ -222,19 +259,113 @@ void prvDSPTask( void *pvParameters )
 	/* Remove compiler warning about unused parameter. */
 	( void ) pvParameters;
 
-	for( ;; )
-	{
+	/*
+	 * RTT debugger brick
+	 */
+	int samples = ADC_RX_BUF_SIZE/2;  	// How many samples are received and sent back. Size of alloc'd buffers in int16 s.
+	int bytesPsamp = sizeof(int16_t); 	// bytes per SENT data sample (2 for int16_t), (4 for float), (8 for complex float)
+	int sleeptime = 3000;
+
+	//initRTTbuffers(samples, bytesPsamp, sleeptime);
+	void * allocArrayI = calloc(samples+1, bytesPsamp);				// Allocate memory for RTT buffer
+	void * allocArrayQ = calloc(samples+1, bytesPsamp);
+	//int16_t allocArrayQ[samples+1];								// Allocate memory for RTT buffer
+	array2RTTbuffer(1, 1, allocArrayI, sizeof(allocArrayI));	// Configure RTT up-buffer '1'='DataOutI'
+	array2RTTbuffer(1, 2, allocArrayQ, sizeof(allocArrayQ));	// Configure RTT up-buffer '2'='DataOutQ
+	int16_t allocDownArrayI[samples+1];								// Allocate memory for RTT buffer
+	int16_t allocDownArrayQ[samples+1];								// Allocate memory for RTT buffer
+	array2RTTbuffer(-1, 1, allocDownArrayI, sizeof(allocDownArrayI));	// Configure RTT down-buffer '1'='DataInI'
+	array2RTTbuffer(-1, 2, allocDownArrayQ, sizeof(allocDownArrayQ));	// Configure RTT down-buffer '2'='DataInQ'
+
+	// Send communication specs over RTT to python scripts
+	int16_t allocArraySpecs[6];									// Allocate memory for RTT buffer
+	array2RTTbuffer(1, 3, allocArraySpecs, sizeof(allocArraySpecs));// Configure RTT up-buffer '3'='DataOut'
+	int16_t specs[6] = {samples, bytesPsamp, sleeptime, samples, bytesPsamp, sleeptime};
+	SEGGER_RTT_Write(3, &specs[0], sizeof(specs));
+
+	// Allocate buffers for read data
+	int16_t readDataI[samples];
+	int16_t readDataQ[samples];
+	uint32_t numBytesI, numBytesQ;
+
+	printf("--- Starting DSP loop (data from Python) ---\n\n");
+
+	for( ;; ){
+		/*
+		 * DATA IN part
+		 */
+		numBytesI = SEGGER_RTT_Read(1, &readDataI[0], sizeof(readDataI));
+		printf("Read %d bytes from down-buff 1 = 'I':\n", (int)numBytesI);
+		numBytesQ = SEGGER_RTT_Read(2, &readDataQ[0], sizeof(readDataQ));
+
+		// CHANGE to just 'if (numBytes)' when comfortable and no prints are needed
+		if (numBytesI > 9) {
+			// Print out a small amount of readings
+			printf(" [");
+			for (int k = 0; k < 10; k++){
+				printf("%d ", readDataI[k]);
+			}
+			printf("... %d]\n", readDataI[numBytesI/2 - 1]);
+			printf("Read %d bytes from down-buff 2 = 'Q':\n [", (int)numBytesQ);
+			for (int k = 0; k < 10; k++){
+				printf("%d ", readDataQ[k]);
+			}
+			printf("... %d]\n", readDataQ[numBytesQ/2 - 1]);
+
+			//TEST DATA FROM SAVED SIGNAL
+			for(int i = 0; i < ADC_RX_BUF_SIZE/2; ++i) {
+					// adcIQ.data[i] = ((uint32_t)readDataQ[i] << 16) | readDataI[i];
+					dsp.raw_IQ[i] = (float)readDataI[i] + I*(float)readDataQ[i];
+			}
+
+			/*
+			 * PROCESS DATA
+			 */
+			/* Do DSP */
+			//prvDSPPipeline();
+			dsp.batch_counter++;			// Another brick in the wall
+
+			/*
+			 * DATA OUT part
+			 */
+			// WRITE DATA to up-buffers
+
+			// MODIFY TO SEND REAL AND IMAG PARTS or SOMETHING
+			//numBytesI = SEGGER_RTT_Write(1, &dsp.raw_IQ[0], samples*bytesPsamp);
+			numBytesI = SEGGER_RTT_Write(1, &readDataI[0], samples*bytesPsamp);	// Write I data to up-buffer '1' = I
+			numBytesQ = SEGGER_RTT_Write(2, &readDataQ[0], samples*bytesPsamp);	// Write Q data to up-buffer '2' = Q
+			//if (numBytesI > 0) printf("Send IQ data back (%d bytes), ", numBytesI);
+			if (numBytesI > 0) printf("Send I data back (%d bytes), ", numBytesI);
+			if (numBytesQ > 0) printf("Send Q data back (%d bytes), ", numBytesQ);
+			printf("Batch num: %d ", (int)dsp.batch_counter);
+
+		}
+		else {
+			dsp.batch_counter = 0;
+			printf("Nothing read; ");
+		}
+
+		// WAIT A LITTLE FOR NEXT LOOP (some secs)
+		printf("Waiting %d secs\n\n", (sleeptime/1000));
+		vTaskDelay(sleeptime);
+	}
+	/*
+	 * ORIGINAL TASK LOOP
+	 */
+	//for( ;; )
+	//{
 		/* The ADCTask gives a notification when data requires processing. This task remains blocked until
 		 * a notification is received. Upon receiving the notification, clear the notification and start DSP. */
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+		//ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
 
 		/* Do DSP */
-		prvDSPPipeline();
-		dsp.batch_counter++;			// Another brick in the wall
+		//prvDSPPipeline();
+		//dsp.batch_counter++;			// Another brick in the wall
 
 		/* TODO: Make sure this task goes back to blocked state after it has performed the DSP.
 		 * Should ulTaskNotifyTake(pdTRUE, portMAX_DELAY) actually be called here instead of before DSP? */
-	}
+	//}
 }
 
 

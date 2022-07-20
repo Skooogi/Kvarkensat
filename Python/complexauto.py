@@ -7,6 +7,7 @@
 
 import pylink           # for JLink and RTT session
 import numpy as np
+import cmath
 import time
 import matplotlib.pyplot as plt
 
@@ -19,8 +20,8 @@ import lil_endian       # simple func. flips and parses the read data bytes
 #
 samples = 800                       # How many samples are processed per loop. DEFAULT
 sleeptime = 3000                    # How long a loop sleeps after sending data. [ms] DEFAULT
-bytes_per_smpl = 2                  # as per int16_t now, should be float though. DEFAULT
-bytes_per_sent = 2                  # as per int16_t, that are sent
+bytes_per_smpl = 8                  # as per int16_t now, should be float though. DEFAULT
+bytes_per_sent = 2                  # as per int16_t, that are sent to STM32 microcontroller
 serial_num = 801003397              # either JLink or device specific (not sure, but works)
 tgt_device = 'STM32H743ZI'
 
@@ -57,7 +58,7 @@ len_total = len(i_data)                            # Total data length to keep c
 # Specs being number of samples to send at a time and how many bytes/sample.
 specs_bytes = jlink.rtt_read(3, 6)
 if len(specs_bytes) >= 6:
-    specs = lil_endian.bytes2ints(specs_bytes, bytes_per_smpl, False)
+    specs = lil_endian.bytes2ints(specs_bytes, bytes_per_sent, False)
     samples = specs[0]
     bytes_per_smpl = specs[1]
     sleeptime = specs[2]
@@ -76,7 +77,7 @@ while True:
 
     # User input 'q' closes RTT session and stops execution of script
     if user == 'q' or user == 'quit' or user == 'n':
-        #jlink.rtt_stop()
+        jlink.rtt_stop()
         print("Stopping execution.\n")
         exit()
 
@@ -144,10 +145,8 @@ while True:
         time.sleep(sleeptime / 1000)
         print(f"Slept for {sleeptime / 1000} seconds. New loop..")
         # Read data from RTT
-        read_bytes_i = jlink.rtt_read(1, leftover_samples * bytes_per_smpl)
-        read_bytes_q = jlink.rtt_read(2, leftover_samples * bytes_per_smpl)
-        read_i_loop = lil_endian.bytes2ints(read_bytes_i, bytes_per_smpl, False)
-        read_q_loop = lil_endian.bytes2ints(read_bytes_q, bytes_per_smpl, False)
+        read_bytes_iq = jlink.rtt_read(1, leftover_samples * bytes_per_smpl)
+        read_iq_loop = lil_endian.bytes2floats(read_bytes_iq, bytes_per_smpl, True)
         # Append data to cumulative buffers
         for j in range(0, len(read_i_loop)):
             read_i.append(read_i_loop[j])

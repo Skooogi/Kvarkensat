@@ -118,6 +118,7 @@ extern TaskHandle_t DSPTaskHandle;
 
 /************* Publicly callable functions *************/
 void prvDSPInit();
+void prvDSPPipeline();
 void prvDSPTask( void *pvParameters );		// Task for digital signal processing of the RF signals
 
 

@@ -10,10 +10,10 @@ import pandas
 #
 # Function and example for parsing bytes read by JLink RTT (-Topi)
 #   - rtt_bytes     =  bytes read by jlink.rtt_read(..) in separate script
-#   - bytes_per_int =  how many bytes per datatype read from RTT, i.e. int_16 => 2
+#   - bytes_per_smpl =  how many bytes per datatype read from RTT, i.e. int_16 => 2
 #   - do_prints     =  Boolean input for whether the function should print its input and output
 #
-def byte_parser(rtt_bytes: list[int], bytes_per_int: int, do_prints: bool) -> list[int]:
+def bytes2ints(rtt_bytes: list[int], bytes_per_int: int, do_prints: bool) -> list[int]:
     if do_prints:
         print(f"'rtt_data' now: {rtt_bytes}")
     # create a new list to be overridden with data
@@ -22,7 +22,7 @@ def byte_parser(rtt_bytes: list[int], bytes_per_int: int, do_prints: bool) -> li
     for i in range(0, len(data)):
         index = i * bytes_per_int
         data[i] = int.from_bytes(rtt_bytes[index:index + bytes_per_int], byteorder='little', signed=False)
-        # print(rtt_bytes[index:index + bytes_per_int])
+        # print(rtt_bytes[index:index + bytes_per_smpl])
 
     if do_prints:
         print(f"'data' now: {data}")
@@ -38,7 +38,7 @@ def byte_parser(rtt_bytes: list[int], bytes_per_int: int, do_prints: bool) -> li
 #
 # Function for deconstructing i-q -data into bytes read by JLink RTT (-Topi)
 #
-def bytes_from_data(data: list[int], bytes_per_int: int, do_prints: bool) -> list[int]:
+def ints2bytes(data: list[int], bytes_per_int: int, do_prints: bool) -> list[int]:
     if do_prints:
         print(f"'data' now: {data}")
     # create a new list to be overridden with data
@@ -48,7 +48,7 @@ def bytes_from_data(data: list[int], bytes_per_int: int, do_prints: bool) -> lis
         bytes_data_point = int.to_bytes(int(data[i]), bytes_per_int, byteorder='little', signed=False)
         for j in range(0, bytes_per_int):
             rtt_bytes[2*i+j] = bytes_data_point[j]
-        # print(rtt_bytes[index:index + bytes_per_int])
+        # print(rtt_bytes[index:index + bytes_per_smpl])
 
     if do_prints:
         print(f"'rtt_bytes' now: {rtt_bytes}")
@@ -56,7 +56,23 @@ def bytes_from_data(data: list[int], bytes_per_int: int, do_prints: bool) -> lis
     return rtt_bytes
 
 
+def bytes2floats(rtt_bytes: list[int], bytes_per_float: int, do_prints: bool) -> list[float]:
+    if do_prints:
+        print(f"'rtt_data' now: {rtt_bytes}")
+    # create a new list to be overridden with data
+    data = list(np.zeros(int(len(rtt_bytes) / bytes_per_float)))
 
+    for i in range(0, len(data)):
+        index = i * bytes_per_int
+        str = hex(int.from_bytes(rtt_bytes[index:index + bytes_per_int], byteorder='little', signed=False))
+
+        data[i] = (float.fromhex(str))
+        # print(rtt_bytes[index:index + bytes_per_smpl])
+
+    if do_prints:
+        print(f"'data' now: {data}")
+
+    return data
 
 #
 # Writing the data to a separate .csv-file

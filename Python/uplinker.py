@@ -66,8 +66,8 @@ while True:
         while True:
             rtt_bytes = jlink.rtt_read(1, readings_per_loop * bytes_per_int)              # Read data in bytes from RTT
             # print(f"RTT read bytes: {rtt_bytes} \n",
-            #       f"where there are {bytes_per_int} bytes per actual reading")
-            new_data = lil_endian.byte_parser(rtt_bytes, bytes_per_int, do_prints=False)  # Parse the bytes to data
+            #       f"where there are {bytes_per_smpl} bytes per actual reading")
+            new_data = lil_endian.bytes2ints(rtt_bytes, bytes_per_int, do_prints=False)  # Parse the bytes to data
             data_per_loop = len(new_data)
             # Check if buffer is empty (new_data is empty)
             if data_per_loop == 0:
@@ -84,8 +84,8 @@ while True:
         print(f"Reading {int(user)} data readings. ")
         rtt_bytes = jlink.rtt_read(1, int(user) * bytes_per_int)
         # print(f"RTT read bytes: {rtt_bytes} \n",
-        #       f"where there are {bytes_per_int} bytes per actual reading")
-        data = lil_endian.byte_parser(rtt_bytes, bytes_per_int, False)
+        #       f"where there are {bytes_per_smpl} bytes per actual reading")
+        data = lil_endian.bytes2ints(rtt_bytes, bytes_per_int, False)
         print(f"Data actually: {data}")
 
     # Ask whether user wants to save data to .csv file

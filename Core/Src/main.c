@@ -32,7 +32,7 @@
 #include "dsp.h"
 #include "cubesat_protocol.h"
 #include "dsp_testing.h"
-#include "saved_signal.h"
+
 
 //FreeRTOS
 #include "FreeRTOS.h"
@@ -146,6 +146,8 @@ static void prvInitBoard()
 	MX_TIM1_Init();
 	MX_TIM2_Init();
 
+	//prvDSPInit();
+
 	SEGGER_RTT_Init();
 	printf("\nConfiguring radio..\n");
 	configureRadio();
@@ -231,10 +233,10 @@ int main(void)
 	//xTaskCreate( prvBlinkLED, "LED", configMINIMAL_STACK_SIZE, NULL, BLINK_PRIORITY, NULL );
 
 	/* Moves test data in between PC (python) & µC over RTT buffers */
-	xTaskCreate( prvDSPTestingTask, "DSPtest", 100, NULL, DSP_TEST_PRIORITY, NULL );
+	//xTaskCreate( prvDSPTestingTask, "DSPtest", 100, NULL, DSP_TEST_PRIORITY, NULL );
 
 	/* Task taking care of digital signal processing */
-	//xTaskCreate( prvDSPTask, "DSP", DSP_STACK_SIZE, NULL,  DSP_PRIORITY, &DSPTaskHandle );
+	xTaskCreate( prvDSPTask, "DSP", DSP_STACK_SIZE, NULL,  DSP_PRIORITY, &DSPTaskHandle );
 
 	/* Start the tasks and timer running. */
 	vTaskStartScheduler();
