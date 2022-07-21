@@ -56,23 +56,25 @@ def ints2bytes(data: list[int], bytes_per_int: int, do_prints: bool) -> list[int
     return rtt_bytes
 
 
-def bytes2floats(rtt_bytes: list[int], bytes_per_float: int, do_prints: bool) -> list[float]:
+def bytes2cfloats(rtt_bytes: list[int], bytes_per_cfloat: int, do_prints: bool) -> list[float]:
     if do_prints:
         print(f"'rtt_data' now: {rtt_bytes}")
     # create a new list to be overridden with data
-    data = list(np.zeros(int(len(rtt_bytes) / bytes_per_float)))
+    real_data = list(np.zeros(int(len(rtt_bytes) / bytes_per_float)))
+    imag_data = list(np.zeros(int(len(rtt_bytes) / bytes_per_float)))
 
     for i in range(0, len(data)):
-        index = i * bytes_per_int
-        str = hex(int.from_bytes(rtt_bytes[index:index + bytes_per_int], byteorder='little', signed=False))
-
-        data[i] = (float.fromhex(str))
+        index = i * bytes_per_cfloat/2
+        str = hex(int.from_bytes(rtt_bytes[index:index + bytes_per_cfloat/2], byteorder='little', signed=False))
+        real_data[i] = (float.fromhex(str))
         # print(rtt_bytes[index:index + bytes_per_smpl])
-
+        index = i * bytes_per_cfloat / 2 + bytes_per_cfloat/2
+        str = hex(int.from_bytes(rtt_bytes[index:index + bytes_per_cfloat/2], byteorder='little', signed=False))
+        imag_data[i] = (float.fromhex(str))
     if do_prints:
-        print(f"'data' now: {data}")
+        print(f"'real_data' now: \n{real_data}\n'imag_data' now: \n{imag_data}\n")
 
-    return data
+    return [real_data, imag_data]
 
 
 #

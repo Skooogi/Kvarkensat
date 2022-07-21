@@ -17,9 +17,11 @@ import lil_endian       # simple func. flips and parses the read data bytes
 # VARIABLES TO MODIFY; Especially 'samples', 'bytes_per_smpl', although they are only DEFAULTS
 #                      that will be used if values are not read from target device in initialization.
 #
-samples = 800                       # How many samples are processed per loop. DEFAULT
-sleeptime = 3000                    # How long a loop sleeps after sending data. [ms] DEFAULT
+samples = 256                       # How many samples are processed per loop. DEFAULT
+sleeptime = 1000                    # How long a loop sleeps after sending data. [ms] DEFAULT
 bytes_per_smpl = 2                  # as per int16_t now, should be float though. DEFAULT
+
+# No need to modify
 bytes_per_sent = 2                  # as per int16_t, that are sent
 serial_num = 801003397              # either JLink or device specific (not sure, but works)
 tgt_device = 'STM32H743ZI'
@@ -76,7 +78,7 @@ while True:
 
     # User input 'q' closes RTT session and stops execution of script
     if user == 'q' or user == 'quit' or user == 'n':
-        #jlink.rtt_stop()
+        jlink.rtt_stop()
         print("Stopping execution.\n")
         exit()
 
@@ -101,18 +103,18 @@ while True:
     read_i = []
     read_q = []
     # LOOP for sending test signal in 'samples' length pieces
-    for k in range(0, loops):
+    k = 0
+    while k < loops:
         #
         # SEND DATA:
         # 1.calculate last idx; 2.convert data to bytes; 3.write data to RTT buffer
         #
-        last_idx = (k+1) * samples * bytes_per_smpl - 1 + 1  # One sacrificial byte must be sent to be missed by RTT read
+        last_idx = (k+1) * samples * bytes_per_sent - 1 + 1  # One sacrificial byte must be sent to be missed by RTT read
 
-        print(f"Sending {samples} samples, sent {k*samples}/{send_sams}, loop {k+1}/{loops}")
-        jlink.rtt_write(1, i_bytes[k * samples * bytes_per_smpl:last_idx])  # write data (as bytes) to RTT down-buffer '1'
-        jlink.rtt_write(2, q_bytes[k * samples * bytes_per_smpl:last_idx])  # write data (as bytes) to RTT down-buffer '2'
+        print(f"Sending {samples} samples, sent {k*samples}/{send_sams}, loop {k+1}/{loops}.")
+        jlink.rtt_write(1, i_bytes[k * samples * bytes_per_sent:last_idx])  # write data (as bytes) to RTT down-buffer '1'
+        jlink.rtt_write(2, q_bytes[k * samples * bytes_per_sent:last_idx])  # write data (as bytes) to RTT down-buffer '2'
 
-        print(f"Sent data. Sleeping..")
         time.sleep(sleeptime / 1000)
         print(f"Slept for {sleeptime / 1000} seconds. New loop..")
 
@@ -124,6 +126,11 @@ while True:
         read_bytes_q = jlink.rtt_read(2, samples * bytes_per_smpl)  # Read Q data from RTT buffer '2'
         read_i_loop = lil_endian.bytes2ints(read_bytes_i, bytes_per_smpl, False)  # Bytes to integers
         read_q_loop = lil_endian.bytes2ints(read_bytes_q, bytes_per_smpl, False)  # Bytes to integers
+        if (len(read_bytes_i) == 0) or (len(read_bytes_q) == 0):
+            print(f"REPEAT at loop {k+1}, no data received back!")
+            continue
+        k += 1
+
 
         #
         # APPEND DATA to cumulative buffers
@@ -137,8 +144,8 @@ while True:
     if leftover_samples > 0:
         print(f"Sending {leftover_samples} leftover samples, sent {loops*samples}/{send_sams}")
         # write data (as bytes) to RTT down-buffer '1' & '2'
-        jlink.rtt_write(1, i_bytes[loops * samples * bytes_per_smpl:len_total * bytes_per_smpl])
-        jlink.rtt_write(2, q_bytes[loops * samples * bytes_per_smpl:len_total * bytes_per_smpl])
+        jlink.rtt_write(1, i_bytes[loops * samples * bytes_per_sent:len_total * bytes_per_sent])
+        jlink.rtt_write(2, q_bytes[loops * samples * bytes_per_sent:len_total * bytes_per_sent])
         # Sleep a synchronized time with STM
         print(f"Sent data. Sleeping..")
         time.sleep(sleeptime / 1000)
@@ -148,6 +155,10 @@ while True:
         read_bytes_q = jlink.rtt_read(2, leftover_samples * bytes_per_smpl)
         read_i_loop = lil_endian.bytes2ints(read_bytes_i, bytes_per_smpl, False)
         read_q_loop = lil_endian.bytes2ints(read_bytes_q, bytes_per_smpl, False)
+        if len(read_bytes_i) == 0:
+            read_i_loop = [2048] * leftover_samples
+        if len(read_bytes_q) == 0:
+            read_q_loop = [2048] * leftover_samples
         # Append data to cumulative buffers
         for j in range(0, len(read_i_loop)):
             read_i.append(read_i_loop[j])
@@ -158,14 +169,14 @@ while True:
     # I data first
     sample_idxs = np.arange(1, len(read_i) + 1)  # 'samples' gives indexes to read data
     plt.figure()
-    plt.plot(sample_idxs, read_i, '.b')
+    plt.plot(sample_idxs, read_i, 'b.', markersize=1)
     plt.xlabel("sample")
     plt.ylabel("RTT Data [unit]")
     plt.title(f"I data from RTT, {len(read_i)} samples")
     # Q data next
     sample_idxs = np.arange(1, len(read_q) + 1)  # 'samples' gives indexes to read data
     plt.figure()
-    plt.plot(sample_idxs, read_q, '.r')
+    plt.plot(sample_idxs, read_q, 'r.', markersize=1)
     plt.xlabel("sample")
     plt.ylabel("RTT Data [unit]")
     plt.title(f"Q data from RTT, {len(read_q)} samples")

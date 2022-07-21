@@ -264,24 +264,22 @@ void prvDSPTask( void *pvParameters )
 	 */
 	int samples = ADC_RX_BUF_SIZE/2;  	// How many samples are received and sent back. Size of alloc'd buffers in int16 s.
 	int bytesPsamp = sizeof(int16_t); 	// bytes per SENT data sample (2 for int16_t), (4 for float), (8 for complex float)
-	int sleeptime = 1000;
+	int sleeptime = 200;
 
 	//initRTTbuffers(samples, bytesPsamp, sleeptime);
-	//void * allocArrayI = calloc(samples+1, bytesPsamp);				// Allocate memory for RTT buffer
-	//void * allocArrayQ = calloc(samples+1, bytesPsamp);
-	int16_t allocArrayI[samples+1];								// Allocate memory for RTT buffer
-	int16_t allocArrayQ[samples+1];								// Allocate memory for RTT buffer
-	array2RTTbuffer(1, 1, allocArrayI, sizeof(allocArrayI));	// Configure RTT up-buffer '1'='DataOutI'
-	array2RTTbuffer(1, 2, allocArrayQ, sizeof(allocArrayQ));	// Configure RTT up-buffer '2'='DataOutQ
-	int16_t allocDownArrayI[samples+1];								// Allocate memory for RTT buffer
-	int16_t allocDownArrayQ[samples+1];								// Allocate memory for RTT buffer
+	void * allocArrayI = calloc(bytesPsamp, samples+1);				// Allocate memory for RTT up-buffer
+	void * allocArrayQ = calloc(bytesPsamp, samples+1);
+	array2RTTbuffer(1, 1, allocArrayI, bytesPsamp*(samples+1));	// Configure RTT up-buffer '1'='DataOutI'
+	array2RTTbuffer(1, 2, allocArrayQ, bytesPsamp*(samples+1)); // Configure RTT up-buffer '2'='DataOutQ
+	int16_t allocDownArrayI[samples+1];								// Allocate memory for RTT down-buffer
+	int16_t allocDownArrayQ[samples+1];								// Down data is always int16_t
 	array2RTTbuffer(-1, 1, allocDownArrayI, sizeof(allocDownArrayI));	// Configure RTT down-buffer '1'='DataInI'
 	array2RTTbuffer(-1, 2, allocDownArrayQ, sizeof(allocDownArrayQ));	// Configure RTT down-buffer '2'='DataInQ'
 
 	// Send communication specs over RTT to python scripts
 	int16_t allocArraySpecs[6];									// Allocate memory for RTT buffer
 	array2RTTbuffer(1, 3, allocArraySpecs, sizeof(allocArraySpecs));// Configure RTT up-buffer '3'='DataOut'
-	int16_t specs[6] = {samples, bytesPsamp, sleeptime, samples, bytesPsamp, sleeptime};
+	int16_t specs[3] = {samples, bytesPsamp, sleeptime};
 	SEGGER_RTT_Write(3, &specs[0], sizeof(specs));
 
 	// Allocate buffers for read data
@@ -301,24 +299,25 @@ void prvDSPTask( void *pvParameters )
 		numBytesQ = SEGGER_RTT_Read(2, &readDataQ[0], sizeof(readDataQ));
 
 		// CHANGE to just 'if (numBytes)' when comfortable and no prints are needed
-		if (numBytesI > 9) {
+		if (numBytesI > 0) {
 			// Print out a small amount of readings
 			printf(" [");
-			for (int k = 0; k < 10; k++){
+			for (int k = 0; k < 4; k++){
 				printf("%d ", readDataI[k]);
 			}
-			printf("... %d]\n", readDataI[numBytesI/2 - 1]);
+			printf("... %d %d %d]\n", readDataI[numBytesI/2 - 3], readDataI[numBytesI/2 - 2], readDataI[numBytesI/2 - 1]);
+			if (numBytesQ == 0) printf("!!!");
 			printf("Read %d bytes from down-buff 2 = 'Q':\n [", (int)numBytesQ);
-			for (int k = 0; k < 10; k++){
+			for (int k = 0; k < 4; k++){
 				printf("%d ", readDataQ[k]);
 			}
-			printf("... %d]\n", readDataQ[numBytesQ/2 - 1]);
+			printf("... %d %d %d]\n", readDataQ[numBytesQ/2 - 3], readDataQ[numBytesQ/2 - 2], readDataQ[numBytesQ/2 - 1]);
 
 			//TEST DATA FROM SAVED SIGNAL
-			//for(int i = 0; i < ADC_RX_BUF_SIZE/2; ++i) {
+			for(int i = 0; i < ADC_RX_BUF_SIZE/2; ++i) {
 					// adcIQ.data[i] = ((uint32_t)readDataQ[i] << 16) | readDataI[i];
-			//		dsp.raw_IQ[i] = (float)readDataI[i] + I*(float)readDataQ[i];
-			//}
+					dsp.raw_IQ[i] = (float)readDataI[i] + I*(float)readDataQ[i];
+			}
 
 			/*
 			 * PROCESS DATA
@@ -333,18 +332,23 @@ void prvDSPTask( void *pvParameters )
 			// WRITE DATA to up-buffers
 
 			// MODIFY TO SEND REAL AND IMAG PARTS or SOMETHING
-			//numBytesI = SEGGER_RTT_Write(1, &dsp.raw_IQ[0], samples*bytesPsamp);
-			numBytesI = SEGGER_RTT_Write(1, &readDataI[0], numBytesI);	// Write I data to up-buffer '1' = I
-			numBytesQ = SEGGER_RTT_Write(2, &readDataQ[0], numBytesQ);	// Write Q data to up-buffer '2' = Q
-			//if (numBytesI > 0) printf("Send IQ data back (%d bytes) \n", numBytesI);
-			if (numBytesI > 0) printf("Send I data back (%d bytes), ", (int)numBytesI);
-			if (numBytesQ > 0) printf("Send Q data back (%d bytes) \n", (int)numBytesQ);
+			//numBytesI = SEGGER_RTT_Write(1, &dsp.raw_IQ[0], bytesPsamp * samples);
+			numBytesI = SEGGER_RTT_Write(1, &readDataI[0], numBytesI / 2 * bytesPsamp);	// Write I data to up-buffer '1' = I
+			numBytesQ = SEGGER_RTT_Write(2, &readDataQ[0], numBytesQ / 2 * bytesPsamp);	// Write Q data to up-buffer '2' = Q
+			//printf("Send IQ data back (%d bytes) \n", numBytesI);
+			printf("Send I data back (%d bytes), ", (int)numBytesI);
+			printf("Send Q data back (%d bytes) \n", (int)numBytesQ);
 			printf("Batch num: %d ", (int)dsp.batch_counter);
+
+			for (int k = 0; k < samples; ++k) {
+				readDataI[k] = 2048;
+				readDataQ[k] = 2048;
+			}
 
 		}
 		else {
-			dsp.batch_counter = 0;
 			printf("Nothing read; ");
+			SEGGER_RTT_Write(3, &specs[0], sizeof(specs));
 		}
 
 		// WAIT A LITTLE FOR NEXT LOOP (some secs)

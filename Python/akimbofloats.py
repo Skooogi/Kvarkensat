@@ -7,21 +7,22 @@
 
 import pylink           # for JLink and RTT session
 import numpy as np
-import cmath
 import time
 import matplotlib.pyplot as plt
 
 
 import lil_endian       # simple func. flips and parses the read data bytes
 
-#
+##
 # VARIABLES TO MODIFY; Especially 'samples', 'bytes_per_smpl', although they are only DEFAULTS
 #                      that will be used if values are not read from target device in initialization.
 #
-samples = 800                       # How many samples are processed per loop. DEFAULT
-sleeptime = 3000                    # How long a loop sleeps after sending data. [ms] DEFAULT
-bytes_per_smpl = 8                  # as per int16_t now, should be float though. DEFAULT
-bytes_per_sent = 2                  # as per int16_t, that are sent to STM32 microcontroller
+samples = 256                       # How many samples are processed per loop. DEFAULT
+sleeptime = 1000                    # How long a loop sleeps after sending data. [ms] DEFAULT
+bytes_per_smpl = 2                  # as per int16_t now, should be float though. DEFAULT
+
+# No need to modify
+bytes_per_sent = 2                  # as per int16_t, that are sent
 serial_num = 801003397              # either JLink or device specific (not sure, but works)
 tgt_device = 'STM32H743ZI'
 
@@ -102,18 +103,18 @@ while True:
     read_i = []
     read_q = []
     # LOOP for sending test signal in 'samples' length pieces
-    for k in range(0, loops):
+    k = 0
+    while k < loops:
         #
         # SEND DATA:
         # 1.calculate last idx; 2.convert data to bytes; 3.write data to RTT buffer
         #
         last_idx = (k+1) * samples * bytes_per_sent - 1 + 1  # One sacrificial byte must be sent to be missed by RTT read
 
-        print(f"Sending {samples} samples, sent {k*samples}/{send_sams}, loop {k+1}/{loops}")
+        print(f"Sending {samples} samples, sent {k*samples}/{send_sams}, loop {k+1}/{loops}.")
         jlink.rtt_write(1, i_bytes[k * samples * bytes_per_sent:last_idx])  # write data (as bytes) to RTT down-buffer '1'
         jlink.rtt_write(2, q_bytes[k * samples * bytes_per_sent:last_idx])  # write data (as bytes) to RTT down-buffer '2'
 
-        print(f"Sent data. Sleeping..")
         time.sleep(sleeptime / 1000)
         print(f"Slept for {sleeptime / 1000} seconds. New loop..")
 
@@ -121,10 +122,13 @@ while True:
         # READ DATA:
         # 1.read rtt buffers; 2.convert bytes to data samples
         #
-        read_bytes_i = jlink.rtt_read(1, samples * bytes_per_smpl)  # Read I data from RTT buffer '1'
-        read_bytes_q = jlink.rtt_read(2, samples * bytes_per_smpl)  # Read Q data from RTT buffer '2'
-        read_i_loop = lil_endian.bytes2ints(read_bytes_i, bytes_per_smpl, False)  # Bytes to integers
-        read_q_loop = lil_endian.bytes2ints(read_bytes_q, bytes_per_smpl, False)  # Bytes to integers
+        read_bytes_iq = jlink.rtt_read(1, samples * bytes_per_smpl)  # Read I data from RTT buffer '1'
+        read_iq_loop = lil_endian.bytes2cfloats(read_bytes_i, bytes_per_smpl, True)  # Bytes to integers
+        if len(read_bytes_iq == 0):
+            print(f"REPEAT at loop {k+1}, no data received back!")
+            continue
+        k += 1
+
 
         #
         # APPEND DATA to cumulative buffers
@@ -145,8 +149,14 @@ while True:
         time.sleep(sleeptime / 1000)
         print(f"Slept for {sleeptime / 1000} seconds. New loop..")
         # Read data from RTT
-        read_bytes_iq = jlink.rtt_read(1, leftover_samples * bytes_per_smpl)
-        read_iq_loop = lil_endian.bytes2floats(read_bytes_iq, bytes_per_smpl, True)
+        read_bytes_i = jlink.rtt_read(1, leftover_samples * bytes_per_smpl)
+        read_bytes_q = jlink.rtt_read(2, leftover_samples * bytes_per_smpl)
+        read_i_loop = lil_endian.bytes2cfloats(read_bytes_i, bytes_per_smpl, True)
+        read_q_loop = lil_endian.bytes2cfloats(read_bytes_q, bytes_per_smpl, True)
+        if len(read_bytes_i) == 0:
+            read_i_loop = [2048] * leftover_samples
+        if len(read_bytes_q) == 0:
+            read_q_loop = [2048] * leftover_samples
         # Append data to cumulative buffers
         for j in range(0, len(read_i_loop)):
             read_i.append(read_i_loop[j])
