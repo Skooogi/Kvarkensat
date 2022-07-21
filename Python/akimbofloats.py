@@ -19,7 +19,7 @@ import lil_endian       # simple func. flips and parses the read data bytes
 #
 samples = 256                       # How many samples are processed per loop. DEFAULT
 sleeptime = 1000                    # How long a loop sleeps after sending data. [ms] DEFAULT
-bytes_per_smpl = 2                  # as per int16_t now, should be float though. DEFAULT
+bytes_per_smpl = 8                  # as per int16_t now, should be float though. DEFAULT
 
 # No need to modify
 bytes_per_sent = 2                  # as per int16_t, that are sent
@@ -123,58 +123,55 @@ while True:
         # 1.read rtt buffers; 2.convert bytes to data samples
         #
         read_bytes_iq = jlink.rtt_read(1, samples * bytes_per_smpl)  # Read I data from RTT buffer '1'
-        read_iq_loop = lil_endian.bytes2cfloats(read_bytes_i, bytes_per_smpl, True)  # Bytes to integers
-        if len(read_bytes_iq == 0):
+        read_iq_loop = lil_endian.bytes2cfloats(read_bytes_iq, bytes_per_smpl, False)  # Bytes to integers
+        if len(read_bytes_iq) == 0:
             print(f"REPEAT at loop {k+1}, no data received back!")
             continue
         k += 1
 
-
         #
         # APPEND DATA to cumulative buffers
         #
-        for j in range(0, len(read_i_loop)):
-            read_i.append(read_i_loop[j])
-        for j in range(0, len(read_q_loop)):
-            read_q.append(read_q_loop[j])
+        for j in range(0, len(read_iq_loop[0])):
+            read_i.append(read_iq_loop[0][j])
+        for j in range(0, len(read_iq_loop[1])):
+            read_q.append(read_iq_loop[1][j])
 
     # SEND possible LEFTOVER data
     if leftover_samples > 0:
         print(f"Sending {leftover_samples} leftover samples, sent {loops*samples}/{send_sams}")
         # write data (as bytes) to RTT down-buffer '1' & '2'
-        jlink.rtt_write(1, i_bytes[loops * samples * bytes_per_sent:len_total * bytes_per_sent])
-        jlink.rtt_write(2, q_bytes[loops * samples * bytes_per_sent:len_total * bytes_per_sent])
+        start_idx = loops * samples * bytes_per_sent
+        jlink.rtt_write(1, i_bytes[start_idx:int(start_idx +leftover_samples * bytes_per_sent)])
+        jlink.rtt_write(2, q_bytes[start_idx:int(start_idx +leftover_samples * bytes_per_sent)])
         # Sleep a synchronized time with STM
         print(f"Sent data. Sleeping..")
         time.sleep(sleeptime / 1000)
         print(f"Slept for {sleeptime / 1000} seconds. New loop..")
         # Read data from RTT
-        read_bytes_i = jlink.rtt_read(1, leftover_samples * bytes_per_smpl)
-        read_bytes_q = jlink.rtt_read(2, leftover_samples * bytes_per_smpl)
-        read_i_loop = lil_endian.bytes2cfloats(read_bytes_i, bytes_per_smpl, True)
-        read_q_loop = lil_endian.bytes2cfloats(read_bytes_q, bytes_per_smpl, True)
-        if len(read_bytes_i) == 0:
-            read_i_loop = [2048] * leftover_samples
-        if len(read_bytes_q) == 0:
-            read_q_loop = [2048] * leftover_samples
-        # Append data to cumulative buffers
-        for j in range(0, len(read_i_loop)):
-            read_i.append(read_i_loop[j])
-        for j in range(0, len(read_q_loop)):
-            read_q.append(read_q_loop[j])
-
+        read_bytes_iq = jlink.rtt_read(1, samples * bytes_per_smpl)  # Read I data from RTT buffer '1'
+        read_iq_loop = lil_endian.bytes2cfloats(read_bytes_iq, bytes_per_smpl, False)  # Bytes to integers
+        if len(read_bytes_iq) == 0:
+            print(f"ERROR with leftovers, no data received back!")
+            continue
+        # APPEND DATA to cumulative buffers
+        for j in range(0, len(read_iq_loop[0])):
+            read_i.append(read_iq_loop[0][j])
+        for j in range(0, len(read_iq_loop[1])):
+            read_q.append(read_iq_loop[1][j])
+        print(f"Leftovers read successfully")
     # PLOTTING
     # I data first
     sample_idxs = np.arange(1, len(read_i) + 1)  # 'samples' gives indexes to read data
     plt.figure()
-    plt.plot(sample_idxs, read_i, '.b')
+    plt.plot(sample_idxs, read_i, 'b.', markersize=1)
     plt.xlabel("sample")
     plt.ylabel("RTT Data [unit]")
     plt.title(f"I data from RTT, {len(read_i)} samples")
     # Q data next
     sample_idxs = np.arange(1, len(read_q) + 1)  # 'samples' gives indexes to read data
     plt.figure()
-    plt.plot(sample_idxs, read_q, '.r')
+    plt.plot(sample_idxs, read_q, 'r.', markersize=1)
     plt.xlabel("sample")
     plt.ylabel("RTT Data [unit]")
     plt.title(f"Q data from RTT, {len(read_q)} samples")

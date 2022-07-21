@@ -263,7 +263,7 @@ void prvDSPTask( void *pvParameters )
 	 * RTT debugger brick
 	 */
 	int samples = ADC_RX_BUF_SIZE/2;  	// How many samples are received and sent back. Size of alloc'd buffers in int16 s.
-	int bytesPsamp = sizeof(int16_t); 	// bytes per SENT data sample (2 for int16_t), (4 for float), (8 for complex float)
+	int bytesPsamp = sizeof(complex float); 	// bytes per SENT data sample (2 for int16_t), (4 for float), (8 for complex float)
 	int sleeptime = 200;
 
 	//initRTTbuffers(samples, bytesPsamp, sleeptime);
@@ -299,7 +299,7 @@ void prvDSPTask( void *pvParameters )
 		numBytesQ = SEGGER_RTT_Read(2, &readDataQ[0], sizeof(readDataQ));
 
 		// CHANGE to just 'if (numBytes)' when comfortable and no prints are needed
-		if (numBytesI > 0) {
+		if ((numBytesI > 0) && (numBytesQ > 0)) {
 			// Print out a small amount of readings
 			printf(" [");
 			for (int k = 0; k < 4; k++){
@@ -332,12 +332,12 @@ void prvDSPTask( void *pvParameters )
 			// WRITE DATA to up-buffers
 
 			// MODIFY TO SEND REAL AND IMAG PARTS or SOMETHING
-			//numBytesI = SEGGER_RTT_Write(1, &dsp.raw_IQ[0], bytesPsamp * samples);
-			numBytesI = SEGGER_RTT_Write(1, &readDataI[0], numBytesI / 2 * bytesPsamp);	// Write I data to up-buffer '1' = I
-			numBytesQ = SEGGER_RTT_Write(2, &readDataQ[0], numBytesQ / 2 * bytesPsamp);	// Write Q data to up-buffer '2' = Q
-			//printf("Send IQ data back (%d bytes) \n", numBytesI);
-			printf("Send I data back (%d bytes), ", (int)numBytesI);
-			printf("Send Q data back (%d bytes) \n", (int)numBytesQ);
+			numBytesI = SEGGER_RTT_Write(1, &dsp.raw_IQ[0], numBytesI / 2 * bytesPsamp);	// Divide by 2 since sent data was typed int16_t
+			//numBytesI = SEGGER_RTT_Write(1, &readDataI[0], numBytesI / 2 * bytesPsamp);	// Write I data to up-buffer '1' = I
+			//numBytesQ = SEGGER_RTT_Write(2, &readDataQ[0], numBytesQ / 2 * bytesPsamp);	// Write Q data to up-buffer '2' = Q
+			printf("Send IQ data back (%d bytes) \n", numBytesI);
+			//printf("Send I data back (%d bytes), ", (int)numBytesI);
+			//printf("Send Q data back (%d bytes) \n", (int)numBytesQ);
 			printf("Batch num: %d ", (int)dsp.batch_counter);
 
 			for (int k = 0; k < samples; ++k) {
@@ -347,7 +347,8 @@ void prvDSPTask( void *pvParameters )
 
 		}
 		else {
-			printf("Nothing read; ");
+			numBytesI = SEGGER_RTT_Write(1, &readDataI[0], 0);   // tells the python script to resend data
+			printf("Missed some data; ");
 			SEGGER_RTT_Write(3, &specs[0], sizeof(specs));
 		}
 

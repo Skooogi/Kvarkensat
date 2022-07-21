@@ -4,6 +4,8 @@
 #   Need to install numpy (you should have it) and pandas (for nice .csv saves)
 #
 import numpy as np
+import struct
+import binascii
 import pandas
 
 
@@ -60,17 +62,22 @@ def bytes2cfloats(rtt_bytes: list[int], bytes_per_cfloat: int, do_prints: bool) 
     if do_prints:
         print(f"'rtt_data' now: {rtt_bytes}")
     # create a new list to be overridden with data
-    real_data = list(np.zeros(int(len(rtt_bytes) / bytes_per_float)))
-    imag_data = list(np.zeros(int(len(rtt_bytes) / bytes_per_float)))
+    real_data = list(np.zeros(int(len(rtt_bytes) / bytes_per_cfloat)))
+    imag_data = list(np.zeros(int(len(rtt_bytes) / bytes_per_cfloat)))
 
-    for i in range(0, len(data)):
-        index = i * bytes_per_cfloat/2
-        str = hex(int.from_bytes(rtt_bytes[index:index + bytes_per_cfloat/2], byteorder='little', signed=False))
-        real_data[i] = (float.fromhex(str))
-        # print(rtt_bytes[index:index + bytes_per_smpl])
-        index = i * bytes_per_cfloat / 2 + bytes_per_cfloat/2
-        str = hex(int.from_bytes(rtt_bytes[index:index + bytes_per_cfloat/2], byteorder='little', signed=False))
-        imag_data[i] = (float.fromhex(str))
+    for i in range(0, len(real_data)):
+        index = int(i * bytes_per_cfloat)
+        integer = int.from_bytes(rtt_bytes[index:int(index + bytes_per_cfloat/2)], byteorder='little', signed=False)
+        i_str = hex(integer)
+        real_data[i]
+
+        index = int(i * bytes_per_cfloat + bytes_per_cfloat/2)
+        integer = int.from_bytes(rtt_bytes[index:int(index + bytes_per_cfloat / 2)], byteorder='little', signed=False)
+        q_str = hex(integer)
+
+        s = struct.unpack('>ff', binascii.unhexlify(i_str[2:] + q_str[2:]))
+        real_data[i] = s[0]
+        imag_data[i] = s[1]
     if do_prints:
         print(f"'real_data' now: \n{real_data}\n'imag_data' now: \n{imag_data}\n")
 
