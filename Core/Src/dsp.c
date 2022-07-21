@@ -260,26 +260,27 @@ void prvDSPTask( void *pvParameters )
 	( void ) pvParameters;
 
 	/*
-	 * RTT debugger brick
+	 * RTT debugger brick   \\   CURRENTLY configured for sending floats back to python
 	 */
-	int samples = ADC_RX_BUF_SIZE/2;  	// How many samples are received and sent back. Size of alloc'd buffers in int16 s.
-	int bytesPsamp = sizeof(complex float); 	// bytes per SENT data sample (2 for int16_t), (4 for float), (8 for complex float)
+	int samples = ADC_RX_BUF_SIZE/2;  		// How many samples are received and sent back. Size of alloc'd buffers in int16 s.
+	int bytesPsamp = sizeof(complex float); // bytes per SENT data sample (2 for int16_t), (4 for float), (8 for complex float)
+			// CONFIGURE HERE ^^ WHAT DATA we are sending back to python: (int16_t) or (complex float)
 	int sleeptime = 200;
 
 	//initRTTbuffers(samples, bytesPsamp, sleeptime);
 	void * allocArrayI = calloc(bytesPsamp, samples+1);				// Allocate memory for RTT up-buffer
 	void * allocArrayQ = calloc(bytesPsamp, samples+1);
-	array2RTTbuffer(1, 1, allocArrayI, bytesPsamp*(samples+1));	// Configure RTT up-buffer '1'='DataOutI'
-	array2RTTbuffer(1, 2, allocArrayQ, bytesPsamp*(samples+1)); // Configure RTT up-buffer '2'='DataOutQ
+	array2RTTbuffer(1, 1, allocArrayI, bytesPsamp*(samples+1));		// Configure RTT up-buffer '1'='DataOutI'
+	array2RTTbuffer(1, 2, allocArrayQ, bytesPsamp*(samples+1)); 	// Configure RTT up-buffer '2'='DataOutQ
 	int16_t allocDownArrayI[samples+1];								// Allocate memory for RTT down-buffer
 	int16_t allocDownArrayQ[samples+1];								// Down data is always int16_t
 	array2RTTbuffer(-1, 1, allocDownArrayI, sizeof(allocDownArrayI));	// Configure RTT down-buffer '1'='DataInI'
 	array2RTTbuffer(-1, 2, allocDownArrayQ, sizeof(allocDownArrayQ));	// Configure RTT down-buffer '2'='DataInQ'
 
 	// Send communication specs over RTT to python scripts
-	int16_t allocArraySpecs[6];									// Allocate memory for RTT buffer
+	int16_t allocArraySpecs[6];										// Allocate memory for RTT buffer
 	array2RTTbuffer(1, 3, allocArraySpecs, sizeof(allocArraySpecs));// Configure RTT up-buffer '3'='DataOut'
-	int16_t specs[3] = {samples, bytesPsamp, sleeptime};
+	int16_t specs[3] = {samples, bytesPsamp, sleeptime};			// These are always int16_t
 	SEGGER_RTT_Write(3, &specs[0], sizeof(specs));
 
 	// Allocate buffers for read data
@@ -332,12 +333,17 @@ void prvDSPTask( void *pvParameters )
 			// WRITE DATA to up-buffers
 
 			// MODIFY TO SEND REAL AND IMAG PARTS or SOMETHING
-			numBytesI = SEGGER_RTT_Write(1, &dsp.raw_IQ[0], numBytesI / 2 * bytesPsamp);	// Divide by 2 since sent data was typed int16_t
-			//numBytesI = SEGGER_RTT_Write(1, &readDataI[0], numBytesI / 2 * bytesPsamp);	// Write I data to up-buffer '1' = I
-			//numBytesQ = SEGGER_RTT_Write(2, &readDataQ[0], numBytesQ / 2 * bytesPsamp);	// Write Q data to up-buffer '2' = Q
-			printf("Send IQ data back (%d bytes) \n", numBytesI);
-			//printf("Send I data back (%d bytes), ", (int)numBytesI);
-			//printf("Send Q data back (%d bytes) \n", (int)numBytesQ);
+			if (bytesPsamp == sizeof(complex float)) {
+				numBytesI = SEGGER_RTT_Write(1, &dsp.raw_IQ[0], numBytesI / 2 * bytesPsamp);// Divide by 2 since sent data was typed int16_t
+				printf("Send IQ data back (%d bytes) \n", numBytesI);
+			}
+			if (bytesPsamp == sizeof(int16_t)) {
+				numBytesI = SEGGER_RTT_Write(1, &readDataI[0], numBytesI / 2 * bytesPsamp);	// Write I data to up-buffer '1' = I
+				numBytesQ = SEGGER_RTT_Write(2, &readDataQ[0], numBytesQ / 2 * bytesPsamp);	// Write Q data to up-buffer '2' = Q
+				printf("Send I data back (%d bytes), ", (int)numBytesI);
+				printf("Send Q data back (%d bytes) \n", (int)numBytesQ);
+			}
+
 			printf("Batch num: %d ", (int)dsp.batch_counter);
 
 			for (int k = 0; k < samples; ++k) {
