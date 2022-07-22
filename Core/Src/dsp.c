@@ -262,7 +262,7 @@ void prvDSPTask( void *pvParameters )
 	/*
 	 * RTT debugger brick   \\   CURRENTLY configured for sending floats back to python
 	 */
-	int samples = ADC_RX_BUF_SIZE/2;  		// How many samples are received and sent back. Size of alloc'd buffers in int16 s.
+	int samples = ADC_RX_BUF_SIZE;  		// How many samples are received and sent back. Size of alloc'd buffers in int16 s.
 	int bytesPsamp = sizeof(complex float); // bytes per SENT data sample (2 for int16_t), (4 for float), (8 for complex float)
 			// CONFIGURE HERE ^^ WHAT DATA we are sending back to python: (int16_t) or (complex float)
 	int sleeptime = 200;
@@ -315,7 +315,7 @@ void prvDSPTask( void *pvParameters )
 			printf("... %d %d %d]\n", readDataQ[numBytesQ/2 - 3], readDataQ[numBytesQ/2 - 2], readDataQ[numBytesQ/2 - 1]);
 
 			//TEST DATA FROM SAVED SIGNAL
-			for(int i = 0; i < ADC_RX_BUF_SIZE/2; ++i) {
+			for(int i = 0; i < samples; ++i) {
 					// adcIQ.data[i] = ((uint32_t)readDataQ[i] << 16) | readDataI[i];
 					dsp.raw_IQ[i] = (float)readDataI[i] + I*(float)readDataQ[i];
 			}
@@ -325,6 +325,8 @@ void prvDSPTask( void *pvParameters )
 			 */
 			/* Do DSP */
 			//prvDSPPipeline();
+			/* Remove DC spike from the data. */
+			prvSubtractMean( dsp.raw_IQ, ADC_RX_BUF_SIZE );
 			dsp.batch_counter++;			// Another brick in the wall
 
 			/*

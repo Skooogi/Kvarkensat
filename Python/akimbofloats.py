@@ -111,12 +111,12 @@ while True:
         #
         last_idx = (k+1) * samples * bytes_per_sent - 1 + 1  # One sacrificial byte must be sent to be missed by RTT read
 
-        print(f"Sending {samples} samples, sent {k*samples}/{send_sams}, loop {k+1}/{loops}.")
+        print(f"Sending {samples} samples, sent {k*samples}/{send_sams}, loop {k+1}/{loops}", end="\r")
         jlink.rtt_write(1, i_bytes[k * samples * bytes_per_sent:last_idx])  # write data (as bytes) to RTT down-buffer '1'
         jlink.rtt_write(2, q_bytes[k * samples * bytes_per_sent:last_idx])  # write data (as bytes) to RTT down-buffer '2'
 
         time.sleep(sleeptime / 1000)
-        print(f"Slept for {sleeptime / 1000} seconds. New loop..")
+        # print(f"Slept for {sleeptime / 1000} seconds. New loop..")
 
         #
         # READ DATA:
@@ -125,7 +125,7 @@ while True:
         read_bytes_iq = jlink.rtt_read(1, samples * bytes_per_smpl)  # Read I data from RTT buffer '1'
         read_iq_loop = lil_endian.bytes2cfloats(read_bytes_iq, bytes_per_smpl, False)  # Bytes to integers
         if len(read_bytes_iq) == 0:
-            print(f"REPEAT at loop {k+1}, no data received back!")
+            print(f"REPEAT at loop {k+1}, no data received back!           ")
             continue
         k += 1
 
@@ -139,20 +139,22 @@ while True:
 
     # SEND possible LEFTOVER data
     if leftover_samples > 0:
-        print(f"Sending {leftover_samples} leftover samples, sent {loops*samples}/{send_sams}")
+        print(f"Sending {leftover_samples} leftover samples, sent {loops*samples}/{send_sams}        ")
         # write data (as bytes) to RTT down-buffer '1' & '2'
         start_idx = loops * samples * bytes_per_sent
-        jlink.rtt_write(1, i_bytes[start_idx:int(start_idx +leftover_samples * bytes_per_sent)])
-        jlink.rtt_write(2, q_bytes[start_idx:int(start_idx +leftover_samples * bytes_per_sent)])
+        # print(f"In BYTES {len(i_bytes[start_idx:int(start_idx + leftover_samples * bytes_per_sent)])}, "
+        #      + f"{len(q_bytes[start_idx:int(start_idx + leftover_samples * bytes_per_sent)])}")
+        jlink.rtt_write(1, i_bytes[start_idx:int(start_idx + leftover_samples * bytes_per_sent)])
+        jlink.rtt_write(2, q_bytes[start_idx:int(start_idx + leftover_samples * bytes_per_sent)])
         # Sleep a synchronized time with STM
-        print(f"Sent data. Sleeping..")
+        # print(f"Sent data. Sleeping..")
         time.sleep(sleeptime / 1000)
-        print(f"Slept for {sleeptime / 1000} seconds. New loop..")
+        # print(f"Slept for {sleeptime / 1000} seconds. New loop..")
         # Read data from RTT
         read_bytes_iq = jlink.rtt_read(1, samples * bytes_per_smpl)  # Read I data from RTT buffer '1'
         read_iq_loop = lil_endian.bytes2cfloats(read_bytes_iq, bytes_per_smpl, False)  # Bytes to integers
         if len(read_bytes_iq) == 0:
-            print(f"ERROR with leftovers, no data received back!")
+            print(f"ERROR with leftovers, no data received back!          ")
             continue
         # APPEND DATA to cumulative buffers
         for j in range(0, len(read_iq_loop[0])):

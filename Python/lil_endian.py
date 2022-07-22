@@ -69,11 +69,14 @@ def bytes2cfloats(rtt_bytes: list[int], bytes_per_cfloat: int, do_prints: bool) 
         index = int(i * bytes_per_cfloat)
         integer = int.from_bytes(rtt_bytes[index:int(index + bytes_per_cfloat/2)], byteorder='little', signed=False)
         i_str = hex(integer)
-        real_data[i]
+        if len(i_str) != 10:
+            i_str = '0x' + '0'*(10 - len(i_str)) + i_str[2:]
 
         index = int(i * bytes_per_cfloat + bytes_per_cfloat/2)
         integer = int.from_bytes(rtt_bytes[index:int(index + bytes_per_cfloat / 2)], byteorder='little', signed=False)
         q_str = hex(integer)
+        if len(q_str) != 10:
+            q_str = '0x' + '0'*(10 - len(q_str)) + q_str[2:]
 
         s = struct.unpack('>ff', binascii.unhexlify(i_str[2:] + q_str[2:]))
         real_data[i] = s[0]
